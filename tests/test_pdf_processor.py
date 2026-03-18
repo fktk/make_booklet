@@ -57,3 +57,46 @@ def test_split_pdf_pages_rtl(sample_pdf):
     assert p1_rect == fitz.Rect(0, 0, 421, 595)
     
     doc.close()
+
+def test_refine_pages():
+    from make_booklet.pdf_processor import refine_pages
+    
+    # 5 pages
+    logical_pages = [(0, None), (1, None), (2, None), (3, None), (4, None)]
+    
+    # Exclude page 1 (index 0) and page 3 (index 2)
+    # Remaining: (1, None), (3, None), (4, None)
+    refined = refine_pages(logical_pages, exclude_indices=[0, 2])
+    assert len(refined) == 4 # 3 remaining + 1 pad
+    assert refined[0] == (1, None)
+    assert refined[1] == (3, None)
+    assert refined[2] == (4, None)
+    assert refined[3] is None
+    
+def test_refine_pages_exclusion_and_padding():
+    from make_booklet.pdf_processor import refine_pages
+    logical_pages = ["A", "B", "C", "D", "E"]
+    
+    # Exclude "A" (0) and "C" (2). Remaining: ["B", "D", "E"]
+    # Pad to 4: ["B", "D", "E", None]
+    refined = refine_pages(logical_pages, exclude_indices=[0, 2])
+    assert refined == ["B", "D", "E", None]
+
+def test_refine_pages_blank_insertion():
+    from make_booklet.pdf_processor import refine_pages
+    logical_pages = ["A", "B", "C"]
+    
+    # Insert blank at index 1 (between A and B)
+    # Result before padding: ["A", None, "B", "C"]
+    # No padding needed as it's already multiple of 4
+    refined = refine_pages(logical_pages, blank_pos=[1])
+    assert refined == ["A", None, "B", "C"]
+
+def test_refine_pages_complex():
+    from make_booklet.pdf_processor import refine_pages
+    logical_pages = ["A", "B", "C", "D", "E"]
+    # 1. Exclude 0(A), 2(C). Remaining: ["B", "D", "E"]
+    # 2. Insert blank at index 1 (between B and D). Result: ["B", None, "D", "E"]
+    # 3. No padding needed.
+    refined = refine_pages(logical_pages, exclude_indices=[0, 2], blank_pos=[1])
+    assert refined == ["B", None, "D", "E"]
