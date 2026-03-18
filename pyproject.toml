@@ -6,5 +6,13 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "pymupdf>=1.27.2",
+]
+
+[dependency-groups]
+dev = [
     "pytest>=9.0.2",
 ]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
