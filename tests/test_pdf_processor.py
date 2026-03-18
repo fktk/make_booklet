@@ -100,3 +100,26 @@ def test_refine_pages_complex():
     # 3. No padding needed.
     refined = refine_pages(logical_pages, exclude_indices=[0, 2], blank_pos=[1])
     assert refined == ["B", None, "D", "E"]
+
+def test_create_booklet(sample_pdf, tmp_path):
+    from make_booklet.pdf_processor import split_pdf_pages, refine_pages, create_booklet
+    output_pdf = tmp_path / "booklet.pdf"
+    
+    # 1. Split
+    doc_in, logical_pages = split_pdf_pages(sample_pdf, direction='ltr')
+    # 2 physical -> 4 logical
+    
+    # 2. Refine (no exclusion/padding needed)
+    refined = refine_pages(logical_pages)
+    
+    # 3. Create Booklet
+    create_booklet(doc_in, refined, str(output_pdf), max_gutter=10.0)
+    
+    # Verify output
+    assert os.path.exists(output_pdf)
+    doc_out = fitz.open(str(output_pdf))
+    # 4 logical pages -> 1 sheet -> 2 physical pages (front and back)
+    assert len(doc_out) == 2
+    
+    doc_in.close()
+    doc_out.close()
