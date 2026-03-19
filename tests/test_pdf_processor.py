@@ -113,12 +113,34 @@ def test_create_booklet(sample_pdf, tmp_path):
     refined = refine_pages(logical_pages)
     
     # 3. Create Booklet
-    create_booklet(doc_in, refined, str(output_pdf), max_gutter=10.0)
+    create_booklet(doc_in, refined, str(output_pdf), max_gutter=10.0, direction='ltr')
     
     # Verify output
     assert os.path.exists(output_pdf)
     doc_out = fitz.open(str(output_pdf))
     # 4 logical pages -> 1 sheet -> 2 physical pages (front and back)
+    assert len(doc_out) == 2
+    
+    doc_in.close()
+    doc_out.close()
+
+def test_create_booklet_rtl(sample_pdf, tmp_path):
+    from make_booklet.pdf_processor import split_pdf_pages, refine_pages, create_booklet
+    output_pdf = tmp_path / "booklet_rtl.pdf"
+    
+    # 1. Split (using rtl for input splitting)
+    doc_in, logical_pages = split_pdf_pages(sample_pdf, direction='rtl')
+    # 2 physical -> 4 logical
+    
+    # 2. Refine
+    refined = refine_pages(logical_pages)
+    
+    # 3. Create Booklet (using rtl for output ordering)
+    create_booklet(doc_in, refined, str(output_pdf), max_gutter=10.0, direction='rtl')
+    
+    # Verify output
+    assert os.path.exists(output_pdf)
+    doc_out = fitz.open(str(output_pdf))
     assert len(doc_out) == 2
     
     doc_in.close()

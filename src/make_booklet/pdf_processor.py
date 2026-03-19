@@ -73,7 +73,7 @@ def refine_pages(logical_pages, exclude_indices=None, blank_pos=None):
         
     return logical_pages
 
-def create_booklet(doc_in, logical_pages, output_path, max_gutter=0.0):
+def create_booklet(doc_in, logical_pages, output_path, max_gutter=0.0, direction='ltr'):
     """
     Assemble the final booklet PDF with imposition and creep compensation.
 
@@ -82,10 +82,11 @@ def create_booklet(doc_in, logical_pages, output_path, max_gutter=0.0):
         logical_pages: Refined list of (page_number, source_rect) or None.
         output_path: Path for the output PDF file.
         max_gutter: Maximum gutter adjustment for outermost pages.
+        direction: 'ltr' (Left-to-Right) or 'rtl' (Right-to-Left).
     """
     doc_out = fitz.open()
     num_pages = len(logical_pages)
-    sequence = get_booklet_sequence(num_pages)
+    sequence = get_booklet_sequence(num_pages, direction=direction)
     
     total_sheets = num_pages // 4
     

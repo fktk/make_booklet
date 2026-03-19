@@ -55,7 +55,7 @@ def main():
     
     # 3. Create Booklet
     try:
-        create_booklet(doc_in, refined_pages, args.output, max_gutter=args.max_gutter)
+        create_booklet(doc_in, refined_pages, args.output, max_gutter=args.max_gutter, direction=args.direction)
     except Exception as e:
         print(f"Error: Failed to create booklet PDF: {e}", file=sys.stderr)
         doc_in.close()
