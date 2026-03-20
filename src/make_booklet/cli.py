@@ -38,6 +38,7 @@ def main():
     parser.add_argument("--blank-pos", help="Positions to insert blanks (e.g., '2,4').")
     parser.add_argument("--max-gutter", type=float, default=0.0,
                         help="Maximum gutter width (in points) for the outermost pages.")
+    parser.add_argument("--dpi", type=float, help="Target DPI for image downsampling (e.g., 150). Images exceeding this resolution will be downsampled.")
     
     args = parser.parse_args()
     
@@ -55,7 +56,7 @@ def main():
     
     # 3. Create Booklet
     try:
-        create_booklet(doc_in, refined_pages, args.output, max_gutter=args.max_gutter, direction=args.direction)
+        create_booklet(doc_in, refined_pages, args.output, max_gutter=args.max_gutter, direction=args.direction, dpi=args.dpi)
     except Exception as e:
         print(f"Error: Failed to create booklet PDF: {e}", file=sys.stderr)
         doc_in.close()
