@@ -37,12 +37,16 @@ uv run python -m make_booklet.cli input.pdf output.pdf [options]
 - `--exclude "1,3-5"`: Specify logical page numbers to exclude (1-based).
 - `--blank-pos "2,4"`: Specify positions to insert blank pages.
 - `--max-gutter <float>`: Maximum gutter adjustment (in points) for the outermost pages.
+- `--dpi <float>`: Target DPI for image downsampling (e.g., 150). Reduces file size by downsampling high-resolution images.
 
 ### Example
 
 ```bash
 # Create a right-to-left booklet with 10pt maximum creep compensation
 uv run python -m make_booklet.cli manga.pdf booklet.pdf --direction rtl --max-gutter 10.0
+
+# Create a booklet with 150 DPI downsampling to reduce file size
+uv run python -m make_booklet.cli high_res_scan.pdf booklet.pdf --dpi 150
 ```
 
 ## Development
