@@ -56,3 +56,22 @@ def test_full_integration_with_exclude(sample_pdf, tmp_path):
     doc = fitz.open(str(output_pdf))
     assert len(doc) == 2 # 4 logical -> 2 physical
     doc.close()
+
+def test_full_integration_with_dpi(sample_pdf, tmp_path):
+    output_pdf = tmp_path / "dpi_booklet.pdf"
+    
+    # 4 logical pages.
+    test_args = [
+        "make_booklet",
+        sample_pdf,
+        str(output_pdf),
+        "--dpi", "150"
+    ]
+    
+    with patch("sys.argv", test_args):
+        main()
+        
+    assert os.path.exists(output_pdf)
+    doc = fitz.open(str(output_pdf))
+    assert len(doc) == 2 # 4 logical -> 2 physical
+    doc.close()
