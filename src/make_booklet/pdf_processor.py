@@ -130,7 +130,7 @@ def refine_pages(logical_pages, exclude_indices=None, blank_pos=None):
         
     return logical_pages
 
-def create_booklet(doc_in, logical_pages, output_path, max_gutter=0.0, direction='ltr'):
+def create_booklet(doc_in, logical_pages, output_path, max_gutter=0.0, direction='ltr', dpi: float = None):
     """
     Assemble the final booklet PDF with imposition and creep compensation.
 
@@ -140,6 +140,7 @@ def create_booklet(doc_in, logical_pages, output_path, max_gutter=0.0, direction
         output_path: Path for the output PDF file.
         max_gutter: Maximum gutter adjustment for outermost pages.
         direction: 'ltr' (Left-to-Right) or 'rtl' (Right-to-Left).
+        dpi: Target DPI for downsampling images.
     """
     doc_out = fitz.open()
     num_pages = len(logical_pages)
@@ -184,5 +185,8 @@ def create_booklet(doc_in, logical_pages, output_path, max_gutter=0.0, direction
             # Draw page content into inner_rect with scaling
             new_page.show_pdf_page(inner_rect, doc_in, src_page_num, clip=src_rect)
             
-    doc_out.save(output_path)
+    if dpi is not None and dpi > 0:
+        downsample_images(doc_out, dpi)
+
+    doc_out.save(output_path, garbage=3, deflate=True)
     doc_out.close()
