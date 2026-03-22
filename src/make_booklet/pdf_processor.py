@@ -58,62 +58,6 @@ def _scan_images(doc: fitz.Document, target_dpi: int):
     
     return results
 
-def downsample_images(doc: fitz.Document, target_dpi: int = 150):
-    """
-    Downsample images in the PDF if their effective DPI is higher than target_dpi.
-
-    Args:
-        doc: The fitz.Document to process.
-        target_dpi: The target dots per inch for images.
-    """
-    processed_xrefs = set()
-    for page in doc:
-        image_list = page.get_images(full=True)
-        for img in image_list:
-            xref = img[0]
-            if xref in processed_xrefs:
-                continue
-                
-            # Get image usage on the page
-            rects = page.get_image_rects(xref)
-            if not rects:
-                continue
-            
-            # Use the largest usage of the image to determine DPI
-            max_rect = max(rects, key=lambda r: r.width * r.height)
-            
-            # Extract image to get its original pixel dimensions
-            base_image = doc.extract_image(xref)
-            if not base_image:
-                continue
-                
-            orig_width = base_image["width"]
-            orig_height = base_image["height"]
-            
-            # Effective DPI = (pixels / points) * 72
-            eff_dpi_w = (orig_width / max_rect.width) * 72
-            eff_dpi_h = (orig_height / max_rect.height) * 72
-            eff_dpi = max(eff_dpi_w, eff_dpi_h)
-            
-            if eff_dpi > target_dpi:
-                # Calculate new dimensions
-                scale = target_dpi / eff_dpi
-                new_width = int(orig_width * scale)
-                new_height = int(orig_height * scale)
-                
-                if new_width <= 0 or new_height <= 0:
-                    continue
-
-                # Create pixmap from original image data
-                pix = fitz.Pixmap(doc, xref)
-                
-                # Rescale Pixmap
-                scaled_pix = fitz.Pixmap(pix, new_width, new_height)
-                
-                # Update the image in the PDF using page.replace_image
-                page.replace_image(xref, pixmap=scaled_pix)
-                processed_xrefs.add(xref)
-
 def split_pdf_pages(input_path: str, direction: str = 'ltr'):
     """
     Split each page of a 2-up PDF into two logical pages.
@@ -240,7 +184,7 @@ def create_booklet(doc_in, logical_pages, output_path, max_gutter=0.0, direction
     if dpi is not None and dpi > 0:
         parallel_downsample_images(doc_out, dpi)
 
-    doc_out.save(output_path, garbage=3, deflate=True)
+    doc_out.save(output_path, garbage=1, deflate=True)
     doc_out.close()
 
 def convert_to_a4(input_path: str, output_path: str):
