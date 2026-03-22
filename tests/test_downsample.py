@@ -1,6 +1,6 @@
 import fitz
 import pytest
-from make_booklet.pdf_processor import downsample_images, create_booklet
+from make_booklet.pdf_processor import parallel_downsample_images, create_booklet
 
 @pytest.fixture
 def high_res_pdf(tmp_path):
@@ -25,9 +25,9 @@ def high_res_pdf(tmp_path):
     doc.close()
     return pdf_path
 
-def test_downsample_images(high_res_pdf):
+def test_parallel_downsample_images(high_res_pdf):
     """
-    Test that downsample_images reduces the resolution of a high-DPI image.
+    Test that parallel_downsample_images reduces the resolution of a high-DPI image.
     Target DPI: 72.
     Expected width/height should be around 100 pixels (100pt @ 72DPI).
     """
@@ -43,7 +43,7 @@ def test_downsample_images(high_res_pdf):
     assert img["height"] == 1000
     
     # Apply downsampling
-    downsample_images(doc, target_dpi=72)
+    parallel_downsample_images(doc, target_dpi=72)
     
     # After downsampling, verify image size
     img_list_after = page.get_images()
@@ -62,7 +62,7 @@ def test_downsample_images(high_res_pdf):
 
 def test_create_booklet_with_dpi(high_res_pdf, tmp_path):
     """
-    Test that create_booklet correctly calls downsample_images and produces a smaller PDF.
+    Test that create_booklet correctly calls parallel_downsample_images and produces a smaller PDF.
     """
     output_path = str(tmp_path / "booklet_downsampled.pdf")
     doc_in = fitz.open(high_res_pdf)

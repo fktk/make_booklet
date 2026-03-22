@@ -3,64 +3,60 @@ Functions for splitting and refining PDF pages for booklet creation.
 """
 import fitz
 import io
+import concurrent.futures
 from make_booklet.reorder import get_booklet_sequence
 from make_booklet.creep import calculate_gutter
 
-def downsample_images(doc: fitz.Document, target_dpi: int = 150):
+def _scan_images(doc: fitz.Document, target_dpi: int):
     """
-    Downsample images in the PDF if their effective DPI is higher than target_dpi.
-
+    Scan for images needing downsampling and return their target dimensions.
+    
     Args:
-        doc: The fitz.Document to process.
-        target_dpi: The target dots per inch for images.
+        doc: The fitz.Document to scan.
+        target_dpi: The target DPI for images.
+        
+    Returns:
+        A list of tuples (xref, target_width, target_height).
     """
-    processed_xrefs = set()
-    for page in doc:
-        image_list = page.get_images(full=True)
-        for img in image_list:
-            xref = img[0]
-            if xref in processed_xrefs:
-                continue
-                
-            # Get image usage on the page
-            rects = page.get_image_rects(xref)
-            if not rects:
-                continue
-            
-            # Use the largest usage of the image to determine DPI
-            max_rect = max(rects, key=lambda r: r.width * r.height)
-            
-            # Extract image to get its original pixel dimensions
-            base_image = doc.extract_image(xref)
-            if not base_image:
-                continue
-                
-            orig_width = base_image["width"]
-            orig_height = base_image["height"]
-            
-            # Effective DPI = (pixels / points) * 72
-            eff_dpi_w = (orig_width / max_rect.width) * 72
-            eff_dpi_h = (orig_height / max_rect.height) * 72
-            eff_dpi = max(eff_dpi_w, eff_dpi_h)
-            
-            if eff_dpi > target_dpi:
-                # Calculate new dimensions
-                scale = target_dpi / eff_dpi
-                new_width = int(orig_width * scale)
-                new_height = int(orig_height * scale)
-                
-                if new_width <= 0 or new_height <= 0:
-                    continue
+    xref_max_dpi = {}
+    xref_orig_dims = {}
 
-                # Create pixmap from original image data
-                pix = fitz.Pixmap(doc, xref)
+    for page in doc:
+        seen_on_page = set()
+        for img in page.get_images(full=True):
+            xref = img[0]
+            if xref in seen_on_page:
+                continue
+            seen_on_page.add(xref)
+            
+            if xref not in xref_orig_dims:
+                base_image = doc.extract_image(xref)
+                if not base_image:
+                    continue
+                xref_orig_dims[xref] = (base_image["width"], base_image["height"])
+            
+            orig_width, orig_height = xref_orig_dims[xref]
+            rects = page.get_image_rects(xref)
+            for rect in rects:
+                # Effective DPI = (pixels / points) * 72
+                eff_dpi_w = (orig_width / rect.width) * 72
+                eff_dpi_h = (orig_height / rect.height) * 72
+                eff_dpi = max(eff_dpi_w, eff_dpi_h)
                 
-                # Rescale Pixmap
-                scaled_pix = fitz.Pixmap(pix, new_width, new_height)
-                
-                # Update the image in the PDF using page.replace_image
-                page.replace_image(xref, pixmap=scaled_pix)
-                processed_xrefs.add(xref)
+                if xref not in xref_max_dpi or eff_dpi > xref_max_dpi[xref]:
+                    xref_max_dpi[xref] = eff_dpi
+
+    results = []
+    for xref, max_dpi in sorted(xref_max_dpi.items()):
+        if max_dpi > target_dpi:
+            orig_width, orig_height = xref_orig_dims[xref]
+            scale = target_dpi / max_dpi
+            new_width = int(orig_width * scale)
+            new_height = int(orig_height * scale)
+            if new_width > 0 and new_height > 0:
+                results.append((xref, new_width, new_height))
+    
+    return results
 
 def split_pdf_pages(input_path: str, direction: str = 'ltr'):
     """
@@ -186,9 +182,9 @@ def create_booklet(doc_in, logical_pages, output_path, max_gutter=0.0, direction
             new_page.show_pdf_page(inner_rect, doc_in, src_page_num, clip=src_rect)
             
     if dpi is not None and dpi > 0:
-        downsample_images(doc_out, dpi)
+        parallel_downsample_images(doc_out, dpi)
 
-    doc_out.save(output_path, garbage=3, deflate=True)
+    doc_out.save(output_path, garbage=1, deflate=True)
     doc_out.close()
 
 def convert_to_a4(input_path: str, output_path: str, orientation: str = 'auto', align: str = 'center'):
@@ -253,3 +249,51 @@ def convert_to_a4(input_path: str, output_path: str, orientation: str = 'auto', 
     doc_out.save(output_path)
     doc_out.close()
     doc.close()
+
+def _resize_pixmap_task(pix: fitz.Pixmap, width: int, height: int) -> fitz.Pixmap:
+    """
+    Rescale a Pixmap to target dimensions.
+    This constructor performs the resizing and releases the GIL.
+    """
+    return fitz.Pixmap(pix, width, height)
+
+def parallel_downsample_images(doc: fitz.Document, target_dpi: int = 150):
+    """
+    Downsample images in the PDF in parallel using multiple CPU threads.
+    
+    Args:
+        doc: The fitz.Document to process.
+        target_dpi: The target dots per inch for images.
+    """
+    # 1. Scan for images that need downsampling
+    tasks = _scan_images(doc, target_dpi)
+    if not tasks:
+        return
+
+    # 2. Parallel resize using ThreadPoolExecutor
+    # PyMuPDF releases the GIL for Pixmap resizing.
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        future_to_xref = {}
+        for xref, target_w, target_h in tasks:
+            try:
+                # Create the initial Pixmap in the main thread (accesses document objects)
+                pix = fitz.Pixmap(doc, xref)
+                # Submit resizing to thread pool
+                future = executor.submit(_resize_pixmap_task, pix, target_w, target_h)
+                future_to_xref[future] = xref
+            except Exception as e:
+                print(f"Error preparing image xref {xref} for downsampling: {e}")
+
+        # 3. Collect results and update the document in the main thread
+        for future in concurrent.futures.as_completed(future_to_xref):
+            xref = future_to_xref[future]
+            try:
+                scaled_pix = future.result()
+                # Update the image in the PDF.
+                # Use doc.update_image if available (PyMuPDF 1.25+), otherwise use page.replace_image.
+                if hasattr(doc, "update_image"):
+                    doc.update_image(xref, pixmap=scaled_pix)
+                elif len(doc) > 0:
+                    doc[0].replace_image(xref, pixmap=scaled_pix)
+            except Exception as e:
+                print(f"Error downsampling image xref {xref}: {e}")
