@@ -191,36 +191,62 @@ def create_booklet(doc_in, logical_pages, output_path, max_gutter=0.0, direction
     doc_out.save(output_path, garbage=3, deflate=True)
     doc_out.close()
 
-def convert_to_a4(input_path: str, output_path: str):
+def convert_to_a4(input_path: str, output_path: str, orientation: str = 'auto', align: str = 'center'):
     """
-    Convert a PDF to A4 size by scaling and centering each page.
+    Convert a PDF to A4 size by scaling and positioning each page.
 
     Args:
         input_path: Path to the input PDF file.
         output_path: Path to the output PDF file.
+        orientation: 'auto' (match input), 'portrait', or 'landscape'.
+        align: 'center', 'left', 'right', 'top', or 'bottom'.
     """
     doc = fitz.open(input_path)
     doc_out = fitz.open()
     
-    # A4 size in points
-    a4_w, a4_h = 595.28, 841.89
+    # A4 dimensions in points
+    A4_P_W, A4_P_H = 595.28, 841.89
+    A4_L_W, A4_L_H = 841.89, 595.28
     
     for page in doc:
-        # Create a new A4 page
-        new_page = doc_out.new_page(width=a4_w, height=a4_h)
+        # Determine target A4 size
+        if orientation == 'auto':
+            if page.rect.width > page.rect.height:
+                target_w, target_h = A4_L_W, A4_L_H
+            else:
+                target_w, target_h = A4_P_W, A4_P_H
+        elif orientation == 'landscape':
+            target_w, target_h = A4_L_W, A4_L_H
+        else: # portrait
+            target_w, target_h = A4_P_W, A4_P_H
+            
+        new_page = doc_out.new_page(width=target_w, height=target_h)
         
-        # Calculate scaling to fit
-        # We want to preserve aspect ratio
-        scale_w = a4_w / page.rect.width
-        scale_h = a4_h / page.rect.height
+        # Calculate scaling to fit while preserving aspect ratio
+        scale_w = target_w / page.rect.width
+        scale_h = target_h / page.rect.height
         scale = min(scale_w, scale_h)
         
-        # Calculate centered rect
         new_w = page.rect.width * scale
         new_h = page.rect.height * scale
-        x = (a4_w - new_w) / 2
-        y = (a4_h - new_h) / 2
         
+        # Calculate positioning based on alignment
+        if align == 'left':
+            x = 0
+            y = (target_h - new_h) / 2
+        elif align == 'right':
+            x = target_w - new_w
+            y = (target_h - new_h) / 2
+        elif align == 'top':
+            x = (target_w - new_w) / 2
+            y = 0
+        elif align == 'bottom':
+            x = (target_w - new_w) / 2
+            y = target_h - new_h
+        else: # center
+            x = (target_w - new_w) / 2
+            y = (target_h - new_h) / 2
+            
         target_rect = fitz.Rect(x, y, x + new_w, y + new_h)
         new_page.show_pdf_page(target_rect, doc, page.number)
         

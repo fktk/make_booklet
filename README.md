@@ -33,6 +33,9 @@ uv run python -m make_booklet.cli input.pdf output.pdf [options]
 
 - `input`: Path to the input PDF file (2-up landscape).
 - `output`: Path for the output booklet PDF.
+- `--to-a4`: Convert input PDF to A4 size before processing.
+- `--a4-orientation {auto,portrait,landscape}`: A4 orientation. `auto` matches the input aspect ratio (default).
+- `--a4-align {center,left,right,top,bottom}`: Positioning within the A4 page. Default is `center`.
 - `--direction {ltr,rtl}`: Binding direction. Default is `ltr`.
 - `--exclude "1,3-5"`: Specify logical page numbers to exclude (1-based).
 - `--blank-pos "2,4"`: Specify positions to insert blank pages.
