@@ -34,6 +34,10 @@ def main():
     parser.add_argument("input", help="Path to the input PDF file.")
     parser.add_argument("output", help="Path for the output PDF file.")
     parser.add_argument("--to-a4", action="store_true", help="Convert input PDF to A4 before processing.")
+    parser.add_argument("--a4-orientation", choices=['auto', 'portrait', 'landscape'], default='auto',
+                        help="A4 orientation: 'auto' (match input), 'portrait', or 'landscape'. Default is 'auto'.")
+    parser.add_argument("--a4-align", choices=['center', 'left', 'right', 'top', 'bottom'], default='center',
+                        help="A4 alignment: 'center', 'left', 'right', 'top', or 'bottom'. Default is 'center'.")
     parser.add_argument("--direction", choices=['ltr', 'rtl'], default='ltr',
                         help="Binding direction: 'ltr' (Left-to-Right) or 'rtl' (Right-to-Left). Default is 'ltr'.")
     parser.add_argument("--exclude", help="Logical pages to exclude (e.g., '1,3-5').")
@@ -48,7 +52,7 @@ def main():
     if args.to_a4:
         a4_temp = "temp_a4.pdf"
         try:
-            convert_to_a4(args.input, a4_temp)
+            convert_to_a4(args.input, a4_temp, orientation=args.a4_orientation, align=args.a4_align)
             input_path = a4_temp
         except Exception as e:
             print(f"Error: Failed to convert to A4: {e}", file=sys.stderr)
