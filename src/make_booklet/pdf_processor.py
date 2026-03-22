@@ -227,3 +227,6 @@ def convert_to_a4(input_path: str, output_path: str):
     doc_out.save(output_path)
     doc_out.close()
     doc.close()
+
+def parallel_downsample_images(doc: fitz.Document, target_dpi: int = 150):
+    pass
