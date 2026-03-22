@@ -6,6 +6,57 @@ import io
 from make_booklet.reorder import get_booklet_sequence
 from make_booklet.creep import calculate_gutter
 
+def _scan_images(doc: fitz.Document, target_dpi: int):
+    """
+    Scan for images needing downsampling and return their target dimensions.
+    
+    Args:
+        doc: The fitz.Document to scan.
+        target_dpi: The target DPI for images.
+        
+    Returns:
+        A list of tuples (xref, target_width, target_height).
+    """
+    xref_max_dpi = {}
+    xref_orig_dims = {}
+
+    for page in doc:
+        seen_on_page = set()
+        for img in page.get_images(full=True):
+            xref = img[0]
+            if xref in seen_on_page:
+                continue
+            seen_on_page.add(xref)
+            
+            if xref not in xref_orig_dims:
+                base_image = doc.extract_image(xref)
+                if not base_image:
+                    continue
+                xref_orig_dims[xref] = (base_image["width"], base_image["height"])
+            
+            orig_width, orig_height = xref_orig_dims[xref]
+            rects = page.get_image_rects(xref)
+            for rect in rects:
+                # Effective DPI = (pixels / points) * 72
+                eff_dpi_w = (orig_width / rect.width) * 72
+                eff_dpi_h = (orig_height / rect.height) * 72
+                eff_dpi = max(eff_dpi_w, eff_dpi_h)
+                
+                if xref not in xref_max_dpi or eff_dpi > xref_max_dpi[xref]:
+                    xref_max_dpi[xref] = eff_dpi
+
+    results = []
+    for xref, max_dpi in sorted(xref_max_dpi.items()):
+        if max_dpi > target_dpi:
+            orig_width, orig_height = xref_orig_dims[xref]
+            scale = target_dpi / max_dpi
+            new_width = int(orig_width * scale)
+            new_height = int(orig_height * scale)
+            if new_width > 0 and new_height > 0:
+                results.append((xref, new_width, new_height))
+    
+    return results
+
 def downsample_images(doc: fitz.Document, target_dpi: int = 150):
     """
     Downsample images in the PDF if their effective DPI is higher than target_dpi.
