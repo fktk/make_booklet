@@ -190,3 +190,40 @@ def create_booklet(doc_in, logical_pages, output_path, max_gutter=0.0, direction
 
     doc_out.save(output_path, garbage=3, deflate=True)
     doc_out.close()
+
+def convert_to_a4(input_path: str, output_path: str):
+    """
+    Convert a PDF to A4 size by scaling and centering each page.
+
+    Args:
+        input_path: Path to the input PDF file.
+        output_path: Path to the output PDF file.
+    """
+    doc = fitz.open(input_path)
+    doc_out = fitz.open()
+    
+    # A4 size in points
+    a4_w, a4_h = 595.28, 841.89
+    
+    for page in doc:
+        # Create a new A4 page
+        new_page = doc_out.new_page(width=a4_w, height=a4_h)
+        
+        # Calculate scaling to fit
+        # We want to preserve aspect ratio
+        scale_w = a4_w / page.rect.width
+        scale_h = a4_h / page.rect.height
+        scale = min(scale_w, scale_h)
+        
+        # Calculate centered rect
+        new_w = page.rect.width * scale
+        new_h = page.rect.height * scale
+        x = (a4_w - new_w) / 2
+        y = (a4_h - new_h) / 2
+        
+        target_rect = fitz.Rect(x, y, x + new_w, y + new_h)
+        new_page.show_pdf_page(target_rect, doc, page.number)
+        
+    doc_out.save(output_path)
+    doc_out.close()
+    doc.close()
