@@ -3,6 +3,7 @@ Functions for splitting and refining PDF pages for booklet creation.
 """
 import fitz
 import io
+import concurrent.futures
 from make_booklet.reorder import get_booklet_sequence
 from make_booklet.creep import calculate_gutter
 
@@ -237,7 +238,7 @@ def create_booklet(doc_in, logical_pages, output_path, max_gutter=0.0, direction
             new_page.show_pdf_page(inner_rect, doc_in, src_page_num, clip=src_rect)
             
     if dpi is not None and dpi > 0:
-        downsample_images(doc_out, dpi)
+        parallel_downsample_images(doc_out, dpi)
 
     doc_out.save(output_path, garbage=3, deflate=True)
     doc_out.close()
@@ -279,5 +280,50 @@ def convert_to_a4(input_path: str, output_path: str):
     doc_out.close()
     doc.close()
 
+def _resize_pixmap_task(pix: fitz.Pixmap, width: int, height: int) -> fitz.Pixmap:
+    """
+    Rescale a Pixmap to target dimensions.
+    This constructor performs the resizing and releases the GIL.
+    """
+    return fitz.Pixmap(pix, width, height)
+
 def parallel_downsample_images(doc: fitz.Document, target_dpi: int = 150):
-    pass
+    """
+    Downsample images in the PDF in parallel using multiple CPU threads.
+    
+    Args:
+        doc: The fitz.Document to process.
+        target_dpi: The target dots per inch for images.
+    """
+    # 1. Scan for images that need downsampling
+    tasks = _scan_images(doc, target_dpi)
+    if not tasks:
+        return
+
+    # 2. Parallel resize using ThreadPoolExecutor
+    # PyMuPDF releases the GIL for Pixmap resizing.
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        future_to_xref = {}
+        for xref, target_w, target_h in tasks:
+            try:
+                # Create the initial Pixmap in the main thread (accesses document objects)
+                pix = fitz.Pixmap(doc, xref)
+                # Submit resizing to thread pool
+                future = executor.submit(_resize_pixmap_task, pix, target_w, target_h)
+                future_to_xref[future] = xref
+            except Exception as e:
+                print(f"Error preparing image xref {xref} for downsampling: {e}")
+
+        # 3. Collect results and update the document in the main thread
+        for future in concurrent.futures.as_completed(future_to_xref):
+            xref = future_to_xref[future]
+            try:
+                scaled_pix = future.result()
+                # Update the image in the PDF.
+                # Use doc.update_image if available (PyMuPDF 1.25+), otherwise use page.replace_image.
+                if hasattr(doc, "update_image"):
+                    doc.update_image(xref, pixmap=scaled_pix)
+                elif len(doc) > 0:
+                    doc[0].replace_image(xref, pixmap=scaled_pix)
+            except Exception as e:
+                print(f"Error downsampling image xref {xref}: {e}")
