@@ -169,13 +169,11 @@ def create_booklet(doc_in, logical_pages, output_path, max_gutter=0.0, direction
             # Destination half width
             dest_half_w = orig_w / 2
             
-            if side_idx == 0: # Left side of physical sheet
-                # Fold is on the RIGHT of this half
-                # Apply gutter to the RIGHT side (inner)
+            if side_idx == 0: # Sequence left page -> Left side of physical sheet
+                # Fold is on the RIGHT of this half (the gutter side)
                 inner_rect = fitz.Rect(0, 0, dest_half_w - gutter, orig_h)
-            else: # Right side of physical sheet
-                # Fold is on the LEFT of this half
-                # Apply gutter to the LEFT side (inner)
+            else: # Sequence right page -> Right side of physical sheet
+                # Fold is on the LEFT of this half (the gutter side)
                 inner_rect = fitz.Rect(dest_half_w + gutter, 0, orig_w, orig_h)
 
             # Draw page content into inner_rect with scaling
